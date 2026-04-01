@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ふく成 有給申請</title>
+<!--
+  ふく成 有給申請システム - LIFF申請フォーム v2
+
+  v1(liff_final.html)からの変更点:
+    - GitHub Pages等の外部ホスティングで動作するスタンドアロン版
+    - GAS APIをContentService経由のJSON APIとして呼び出し
+    - googleusercontent.comリダイレクト問題を完全回避
+
+  デプロイ先: GitHub Pages / Netlify / Cloudflare Pages 等
+  LIFF エンドポイントURL: デプロイ先のURL（例: https://fukunari.github.io/yukyu/）
+-->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{--green:#06C755;--green-dark:#05a648;--green-light:#e8f9ef;--navy:#1a2744;--navy-light:#2d3f5e;--white:#fff;--gray-50:#f8f9fb;--gray-100:#f0f2f5;--gray-200:#e1e5eb;--gray-300:#c8ced8;--gray-400:#9ca5b4;--gray-500:#6b7585;--red:#e53e3e;--orange:#ed8936;--blue:#3182ce;--radius:12px;--radius-lg:16px;--shadow:0 4px 12px rgba(26,39,68,0.1)}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{height:100%}
+  body{font-family:'Noto Sans JP',sans-serif;background:var(--gray-50);color:var(--navy);min-height:100%;padding-bottom:120px}
+  .header{background:var(--navy);padding:16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+  .header-logo{width:34px;height:34px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'M PLUS Rounded 1c',sans-serif;font-weight:700;font-size:13px;color:white}
+  .header-text{color:white}
+  .header-title{font-size:15px;font-weight:600}
+  .header-sub{font-size:11px;opacity:0.5}
+  .nav{display:flex;background:white;border-bottom:1px solid var(--gray-200);position:sticky;top:66px;z-index:49}
+  .nav-item{flex:1;padding:12px 4px;text-align:center;font-size:12px;font-weight:500;color:var(--gray-400);border-bottom:3px solid transparent;cursor:pointer}
+  .nav-item.active{color:var(--green);border-bottom-color:var(--green);font-weight:600}
+  .screen{display:none;padding:16px}.screen.active{display:block;animation:fadeUp .2s}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .banner{background:linear-gradient(135deg,var(--navy),var(--navy-light));border-radius:var(--radius-lg);padding:18px;color:white;margin-bottom:14px}
+  .banner-greeting{font-size:11px;opacity:0.6}.banner-name{font-size:18px;font-weight:700;font-family:'M PLUS Rounded 1c',sans-serif;margin-top:2px}
+  .stats{display:flex;gap:8px;margin-top:12px}
+  .stat{flex:1;background:rgba(255,255,255,0.1);border-radius:10px;padding:10px 8px;text-align:center}
+  .stat-num{font-size:22px;font-weight:700;font-family:'M PLUS Rounded 1c',sans-serif}.stat-label{font-size:9px;opacity:0.6;margin-top:2px}
+  .card{background:white;border-radius:var(--radius-lg);padding:20px 18px;box-shadow:var(--shadow);margin-bottom:12px}
+  .card-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:16px}
+  .card-icon{width:28px;height:28px;background:var(--green-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .form-group{margin-bottom:16px}.form-label{display:block;font-size:12px;font-weight:500;color:var(--gray-500);margin-bottom:6px}.form-label .req{color:var(--red);font-size:10px;margin-left:4px}
+  .form-input,.form-select,.form-textarea{width:100%;padding:12px 14px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:15px;font-family:'Noto Sans JP',sans-serif;color:var(--navy);background:white;outline:none;transition:border-color .2s;-webkit-appearance:none}
+  .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(6,199,85,0.1)}
+  .form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%239ca5b4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+  .form-textarea{min-height:80px;resize:vertical}
+  .date-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}.date-sep{font-size:14px;color:var(--gray-400);text-align:center}
+  .days-box{background:var(--green-light);border:1px solid rgba(6,199,85,0.2);border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+  .days-label{font-size:12px;color:var(--gray-500)}.days-sub{font-size:10px;color:var(--gray-400);margin-top:2px}.days-num{font-size:24px;font-weight:700;color:var(--green);font-family:'M PLUS Rounded 1c',sans-serif}.days-unit{font-size:12px;color:var(--gray-500)}
+  .flow{display:flex;align-items:center;justify-content:center;gap:4px;padding:12px 0}.flow-node{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .flow-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;background:var(--gray-300)}.flow-dot.active{background:var(--blue)}.flow-text{font-size:9px;color:var(--gray-400)}.flow-line{width:18px;height:2px;background:var(--gray-200);margin-bottom:14px}
+  .submit-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;background:var(--green);color:white;border:none;border-radius:var(--radius);font-size:15px;font-weight:600;font-family:'Noto Sans JP',sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(6,199,85,0.3);transition:all .15s;position:fixed;bottom:16px;left:16px;right:16px;max-width:488px;margin:0 auto;z-index:100}
+  .submit-btn:active{transform:scale(0.98)}.submit-btn:disabled{background:var(--gray-300);box-shadow:none}
+  .status-card{background:white;border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+  .status-name{font-size:13px;font-weight:600}.status-date{font-size:11px;color:var(--gray-400);margin-top:2px}
+  .badge{padding:4px 10px;border-radius:20px;font-size:10px;font-weight:600}.badge-pending{background:#fffaf0;color:var(--orange)}.badge-done{background:var(--green-light);color:var(--green)}.badge-rejected{background:#fff5f5;color:var(--red)}
+  .result-overlay{display:none;position:fixed;inset:0;background:rgba(26,39,68,0.5);z-index:200;align-items:center;justify-content:center;padding:20px}.result-overlay.show{display:flex;animation:fadeUp .2s}
+  .result-box{background:white;border-radius:var(--radius-lg);padding:32px 24px;text-align:center;max-width:320px;width:100%}.result-icon{font-size:52px;margin-bottom:14px}.result-title{font-size:18px;font-weight:700;margin-bottom:6px}.result-desc{font-size:13px;color:var(--gray-500);line-height:1.6;margin-bottom:20px;white-space:pre-line}
+  .result-btn{width:100%;padding:14px;background:var(--green);color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;font-family:'Noto Sans JP',sans-serif;cursor:pointer}
+  .loading{text-align:center;padding:40px;color:var(--gray-400)}.spinner{width:28px;height:28px;border:3px solid var(--gray-200);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 10px}@keyframes spin{to{transform:rotate(360deg)}}.empty{text-align:center;padding:30px;color:var(--gray-400);font-size:13px}
+  .error-banner{background:#fff5f5;border:1px solid #fed7d7;border-radius:10px;padding:14px 16px;margin:16px;color:var(--red);font-size:13px;text-align:center;display:none}
+</style>
+</head>
+<body>
+<div class="header"><div class="header-logo">ふ</div><div class="header-text"><div class="header-title">有給申請システム</div><div class="header-sub">株式会社ふく成</div></div></div>
+<div class="nav"><div class="nav-item active" onclick="showScreen('apply',this)">📝 申請</div><div class="nav-item" onclick="showScreen('balance',this)">📊 残日数</div><div class="nav-item" onclick="showScreen('status',this)">📋 履歴</div></div>
+<div class="error-banner" id="errorBanner"></div>
+<div class="screen active" id="screen-apply">
+  <div class="banner"><div class="banner-greeting" id="greeting">こんにちは</div><div class="banner-name" id="userName">読み込み中...</div><div class="stats"><div class="stat"><div class="stat-num" id="statRemain">-</div><div class="stat-label">残り有給</div></div><div class="stat"><div class="stat-num" id="statUsed">-</div><div class="stat-label">今年使用</div></div><div class="stat"><div class="stat-num" id="statPending">-</div><div class="stat-label">申請中</div></div></div></div>
+  <div class="card"><div class="card-title"><div class="card-icon">📅</div> 有給休暇申請</div>
+    <div class="form-group"><label class="form-label">休暇種別 <span class="req">必須</span></label><select class="form-select" id="leaveType" onchange="updateDays()"><option value="paid">有給休暇</option><option value="half_am">午前半休</option><option value="half_pm">午後半休</option><option value="special">特別休暇</option></select></div>
+    <div class="form-group"><label class="form-label">取得日 <span class="req">必須</span></label><div class="date-row"><input type="date" class="form-input" id="dateFrom" onchange="updateDays()"><span class="date-sep">〜</span><input type="date" class="form-input" id="dateTo" onchange="updateDays()"></div></div>
+    <div class="form-group"><label class="form-label">申請理由</label><textarea class="form-textarea" id="reason" placeholder="例：家庭の事情のため（任意）"></textarea></div>
+    <div class="form-group"><div class="days-box"><div><div class="days-label">取得日数</div><div class="days-sub">残り有給から差し引かれます</div></div><div><span class="days-num" id="dayCount">1</span><span class="days-unit">日</span></div></div></div>
+  </div>
+  <div class="card"><div class="card-title"><div class="card-icon">🔄</div> 承認フロー</div><div class="flow"><div class="flow-node"><div class="flow-dot active">📝</div><div class="flow-text">申諊者</div></div><div class="flow-line"></div><div class="flow-node"><div class="flow-dot">人事</div><div class="flow-text">人事確認</div></div><div class="flow-line"></div><div class="flow-node"><div class="flow-dot">取締</div><div class="flow-text">取締役</div></div><div class="flow-line"></div><div class="flow-node"><div class="flow-dot">社長</div><div class="flow-text">最終承認</div></div></div><div style="text-align:center;font-size:10px;color:var(--gray-400);">各承認者にLINEで通知が届きます</div></div>
+  <button class="submit-btn" id="submitBtn" onclick="submitApplication()">LINEで申請を送信</button>
+</div>
+<div class="screen" id="screen-balance"><div class="card"><div class="card-title"><div class="card-icon">📊</div> 有給残日数</div><div id="balanceContent"><div class="loading"><div class="spinner"></div>読み込み中...</div></div></div></div>
+<div class="screen" id="screen-status"><div style="font-size:14px;font-weight:600;margin-bottom:12px;">申請履歴</div><div id="statusList"><div class="loading"><div class="spinner"></div>読み込み中...</div></div></div>
+<div class="result-overlay" id="resultModal"><div class="result-box"><div class="result-icon" id="resultIcon">✅</div><div class="result-title" id="resultTitle">申請完了</div><div class="result-desc" id="resultDesc"></div><button class="result-btn" onclick="closeResult()">OK</button></div></div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+// ============================================================
+// 設定値
+// ============================================================
+var LIFF_ID = '2009572270-53BfNYY5';
+
+// GAS WebアプリのURL（デプロイ後に差し替え）
+// ※ page=api を付けて呼ぶことで ContentService（JSON）が返る
+var API_BASE = 'https://script.google.com/macros/s/AKfycbx8F5G0H70zGwkjW4xN6Xk3Opl73eoxr889y40l1VcK64V96gYX2_jmUZXye9gcyoUy/exec';
+
+var userId = null;
+var employee = null;
+
+// ============================================================
+// 初期化
+//
+// LINEアプリ内ブラウザでの挙動:
+//   1. liff.init() でLIFF SDKを初期化
+//   2. isLoggedIn() が false → liff.login() で認証画面へリダイレクト
+//   3. 認証後、ページが再読み込みされ initApp() が再実行
+//   4. isLoggedIn() が true → getProfile() でuserIdを取得
+//
+// 外部ブラウザ（PCなど）でアクセスした場合:
+//   liff.login() がLINEログイン画面にリダイレクト
+// ============================================================
+function initApp() {
+  setGreeting();
+  setDefaultDates();
+
+  liff.init({ liffId: LIFF_ID }).then(function() {
+    // LIFF初期化成功
+    console.log('LIFF init OK. isLoggedIn:', liff.isLoggedIn());
+    console.log('LIFF isInClient:', liff.isInClient());
+
+    if (!liff.isLoggedIn()) {
+      // 未ログイン → LINE認証画面へリダイレクト
+      // リダイレクト後にページが再読み込みされるので、ここで処理は終了
+      liff.login();
+      return;
+    }
+
+    // ログイン済み → プロフィール取得
+    return liff.getProfile().then(function(profile) {
+      if (profile && profile.userId) {
+        userId = profile.userId;
+        console.log('Profile OK. userId:', userId.substring(0, 8) + '...');
+        loadEmployeeData();
+      } else {
+        showError('プロフィール情報を取得できませんでした。LINEアプリから開き直してください。');
+        document.getElementById('userName').textContent = 'エラー';
+      }
+    });
+  }).catch(function(err) {
+    console.error('LIFF error:', err);
+
+    // エラー種別に応じたメッセージ
+    var msg = 'LIFF初期化エラー';
+    if (err && err.code) {
+      switch (err.code) {
+        case 'INVALID_ARGUMENT':
+          msg = 'LIFF IDが不正です。設定を確認してください。';
+          break;
+        case 'UNAUTHORIZED':
+          msg = '認証エラー。LIFFエンドポイントURLを確認してください。';
+          break;
+        case 'FORBIDDEN':
+          msg = 'アクセス権限がありません。LINEチャネル設定を確認してください。';
+          break;
+        default:
+          msg = 'エラー(' + err.code + '): ' + (err.message || '');
+      }
+    } else if (err && err.message) {
+      msg = err.message;
+    }
+
+    showError(msg);
+    document.getElementById('userName').textContent = 'エラー';
+  });
+}
+
+// ============================================================
+// エラー表示
+// ============================================================
+function showError(msg) {
+  var banner = document.getElementById('errorBanner');
+  banner.textContent = msg;
+  banner.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('errorBanner').style.display = 'none';
+}
+
+// ============================================================
+// API呼び出し（GAS ContentService JSON API）
+//
+// fetch() で GAS API を呼ぶ。
+// GAS は ContentService で JSON を返すため、
+// googleusercontent.com のリダイレクト問題は発生しない。
+//
+// 注意: GAS の公開URLは 302リダイレクトするため、
+// fetch の redirect: 'follow'（デフォルト）が必要。
+// ============================================================
+function apiCall(action, params) {
+  var url = API_BASE + '?page=api&action=' + action;
+  if (params) {
+    var keys = Object.keys(params);
+    for (var i = 0; i < keys.length; i++) {
+      url += '&' + keys[i] + '=' + encodeURIComponent(params[keys[i]]);
+    }
+  }
+  return fetch(url, {
+    method: 'GET',
+    redirect: 'follow'
+  }).then(function(response) {
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+    return response.json();
+  });
+}
+
+// ============================================================
+// データ読み込み
+// ============================================================
+function setGreeting() {
+  var h = new Date().getHours();
+  document.getElementById('greeting').textContent = h < 12 ? 'おはようございます' : h < 17 ? 'こんにちは' : 'お疲れさまです';
+}
+
+function setDefaultDates() {
+  var d = new Date();
+  d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  var s = d.toISOString().split('T')[0];
+  document.getElementById('dateFrom').value = s;
+  document.getElementById('dateTo').value = s;
+}
+
+function loadEmployeeData() {
+  hideError();
+  apiCall('getEmployee', { uid: userId }).then(function(data) {
+    if (data && data.name) {
+      employee = data;
+      document.getElementById('userName').textContent = data.name;
+      document.getElementById('statRemain').textContent = data.remaining;
+      document.getElementById('statUsed').textContent = data.used;
+      document.getElementById('statPending').textContent = data.pending;
+      renderBalance(data);
+      loadMyRequests();
+    } else {
+      document.getElementById('userName').textContent = '未登録';
+      document.getElementById('statRemain').textContent = '-';
+      document.getElementById('statUsed').textContent = '-';
+      document.getElementById('statPending').textContent = '-';
+      document.getElementById('balanceContent').innerHTML = '<div class="empty">社員マスタに未登録です</div>';
+      document.getElementById('statusList').innerHTML = '<div class="empty">社員マスタに未登録です</div>';
+    }
+  }).catch(function(err) {
+    console.error('API error:', err);
+    showError('データ取得エラー。ネットワーク接続を確認してください。');
+    document.getElementById('userName').textContent = '通信エラー';
+  });
+}
+
+function renderBalance(e) {
+  var t = e.granted + e.carryover;
+  var p = t > 0 ? Math.min(100, Math.max(0, (e.remaining / t) * 100)) : 0;
+  var c = e.remaining <= 3 ? 'var(--red)' : e.remaining <= 7 ? 'var(--orange)' : 'var(--green)';
+  document.getElementById('balanceContent').innerHTML =
+    '<div style="text-align:center;padding:10px 0;">' +
+      '<div style="font-size:48px;font-weight:700;color:' + c + ';font-family:M PLUS Rounded 1c,sans-serif;">' + e.remaining + '<span style="font-size:16px;color:var(--gray-400);">日</span></div>' +
+      '<div style="font-size:12px;color:var(--gray-400);margin-top:4px;">残り有給日数</div>' +
+    '</div>' +
+    '<div style="background:var(--gray-100);border-radius:6px;height:8px;margin:16px 0 12px;overflow:hidden;">' +
+      '<div style="width:' + p + '%;height:100%;background:' + c + ';border-radius:6px;"></div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);">' +
+      '<span>年間付与: ' + e.granted + '日</span><span>繰越: ' + e.carryover + '日</span>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);margin-top:4px;">' +
+      '<span>使用済: ' + e.used + '日</span><span>申請中: ' + e.pending + '日</span>' +
+    '</div>';
+}
+
+function loadMyRequests() {
+  apiCall('getMyRequests', { uid: userId }).then(function(reqs) {
+    var h = '';
+    if (!reqs || reqs.length === 0) {
+      h = '<div class="empty">申請履歴はありません</div>';
+    } else {
+      reqs.reverse();
+      for (var i = 0; i < reqs.length; i++) {
+        var r = reqs[i];
+        var st = String(r[18]);
+        var bc = st === '承認完了' ? 'badge-done' : st === '差戻し' ? 'badge-rejected' : 'badge-pending';
+        var bt = st === '承認完了' ? '承認済み' : st === '差戻し' ? '差戻し' : '承認待ち';
+        h += '<div class="status-card"><div><div class="status-name">' + r[0] + ' ' + r[4] + '</div><div class="status-date">' + r[5] + '〜' + r[6] + ' (' + r[7] + '日間)</div></div><span class="badge ' + bc + '">' + bt + '</span></div>';
+      }
+    }
+    document.getElementById('statusList').innerHTML = h;
+  });
+}
+
+// ============================================================
+// 画面切り替え
+// ============================================================
+function showScreen(name, el) {
+  var items = document.querySelectorAll('.nav-item');
+  for (var i = 0; i < items.length; i++) items[i].classList.remove('active');
+  el.classList.add('active');
+  var screens = document.querySelectorAll('.screen');
+  for (var j = 0; j < screens.length; j++) screens[j].classList.remove('active');
+  document.getElementById('screen-' + name).classList.add('active');
+  document.getElementById('submitBtn').style.display = name === 'apply' ? 'flex' : 'none';
+}
+
+// ============================================================
+// 日数計算
+// ============================================================
+function updateDays() {
+  var f = new Date(document.getElementById('dateFrom').value);
+  var t = new Date(document.getElementById('dateTo').value);
+  if (isNaN(f) || isNaN(t) || t < f) {
+    document.getElementById('dayCount').textContent = '-';
+    return;
+  }
+  var d = Math.ceil((t - f) / 86400000) + 1;
+  var ty = document.getElementById('leaveType').value;
+  if (ty === 'half_am' || ty === 'half_pm') d = d * 0.5;
+  document.getElementById('dayCount').textContent = d;
+}
+
+// ============================================================
+// 申請送信
+// ============================================================
+function submitApplication() {
+  if (!userId) {
+    alert('ログイン情報が取得できません。\n\nLINEアプリから開き直してください。\n（外部ブラウザでは利用できません）');
+    // 再ログインを試みる
+    if (liff.isInClient && liff.isInClient()) {
+      liff.login();
+    }
+    return;
+  }
+  if (!employee) { alert('社員情報が見つかりません。\n社員マスタにLINE UIDが登録されているか確認してください。'); return; }
+  var df = document.getElementById('dateFrom').value;
+  var dt = document.getElementById('dateTo').value;
+  if (!df || !dt) { alert('取得日を入力してください。'); return; }
+  var days = parseFloat(document.getElementById('dayCount').textContent);
+  if (isNaN(days) || days <= 0) { alert('日付を正しく入力してください。'); return; }
+  if (days > employee.remaining) {
+    alert('有給残日数が不足しています。\n申請: ' + days + '日 / 残り: ' + employee.remaining + '日');
+    return;
+  }
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+  apiCall('submit', {
+    uid: userId,
+    dateFrom: df.replace(/-/g, '/'),
+    dateTo: dt.replace(/-/g, '/'),
+    leaveType: document.getElementById('leaveType').value,
+    reason: document.getElementById('reason').value,
+    days: days
+  }).then(function(r) {
+    btn.disabled = false;
+    btn.innerHTML = 'LINEで申請を送信';
+    if (r && r.success) {
+      showResult('✅', '申請を送信しました', '申請ID: ' + r.requestId + '\n人事担当にLINE通知を送信しました。');
+      loadEmployeeData();
+    } else {
+      alert('送信失敗: ' + (r ? r.error : '不明'));
+    }
+  }).catch(function(err) {
+    btn.disabled = false;
+    btn.innerHTML = 'LINEで申請を送信';
+    alert('エラー: ' + err);
+  });
+}
+
+// ============================================================
+// 結果モーダル
+// ============================================================
+function showResult(icon, title, desc) {
+  document.getElementById('resultIcon').textContent = icon;
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultDesc').textContent = desc;
+  document.getElementById('resultModal').classList.add('show');
+}
+
+function closeResult() {
+  document.getElementById('resultModal').classList.remove('show');
+}
+
+// ============================================================
+// 起動
+// ============================================================
+initApp();
+</script>
+</body>
+</html>
